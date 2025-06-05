@@ -1,4 +1,4 @@
-# practica_3_database
+# Práctica 3: Práctica de base de datos
 
 A new Flutter project.
 
