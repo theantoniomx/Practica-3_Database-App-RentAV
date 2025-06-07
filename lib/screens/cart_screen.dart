@@ -22,6 +22,7 @@ class CartScreen extends StatelessWidget {
 
   Future<List<Map<String, dynamic>>> _getCartDetails(
     Map<int, int> cartItems,
+    int days,
   ) async {
     final List<Map<String, dynamic>> details = [];
     for (var entry in cartItems.entries) {
@@ -30,7 +31,7 @@ class CartScreen extends StatelessWidget {
         details.add({
           'equipment': equipment,
           'quantity': entry.value,
-          'subtotal': equipment.price * entry.value,
+          'subtotal': equipment.price * entry.value * days,
         });
       }
     }
@@ -41,13 +42,14 @@ class CartScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final cartProvider = Provider.of<CartProvider>(context);
     final cartItems = cartProvider.cartItems;
+    final int days = endDate.difference(startDate).inDays + 1;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Carrito de renta')),
       body: cartItems.isEmpty
           ? const Center(child: Text('Tu carrito está vacío'))
           : FutureBuilder<List<Map<String, dynamic>>>(
-              future: _getCartDetails(cartItems),
+              future: _getCartDetails(cartItems, days), 
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -83,7 +85,7 @@ class CartScreen extends StatelessWidget {
                               ),
                               title: Text(equipment.name),
                               subtitle: Text(
-                                'Cantidad: $quantity\nPrecio unitario: \$${equipment.price.toStringAsFixed(2)}\nSubtotal: \$${subtotal.toStringAsFixed(2)}',
+                                'Precio unitario: \$${equipment.price.toStringAsFixed(2)} x $days días\nSubtotal: \$${subtotal.toStringAsFixed(2)}',
                               ),
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete_outline),

@@ -4,11 +4,14 @@ import 'providers/cart_provider.dart';
 import 'providers/rent_provider.dart';
 import 'screens/home_screen.dart';
 import 'services/db_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DBService().deleteDatabaseFile();
+  //await DBService().deleteDatabaseFile();
   await DBService().preloadData();
+  await NotificationService.initialize();
+  await NotificationService.showTestNotification();
 
   runApp(
     MultiProvider(

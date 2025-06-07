@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:practica_3_database/screens/calendar_screen.dart';
 import 'package:provider/provider.dart';
+
+import 'package:practica_3_database/screens/calendar_screen.dart';
 import 'package:practica_3_database/providers/cart_provider.dart';
 import 'package:practica_3_database/models/rent.dart';
 import 'package:practica_3_database/models/rent_detail.dart';
 import 'package:practica_3_database/models/user.dart';
-import 'package:practica_3_database/services/db_service.dart';
 import 'package:practica_3_database/models/equipment.dart';
+import 'package:practica_3_database/services/db_service.dart';
+import 'package:practica_3_database/services/notification_service.dart';
 
 class ConfirmRentScreen extends StatelessWidget {
   final String title;
@@ -24,22 +26,24 @@ class ConfirmRentScreen extends StatelessWidget {
     required this.items,
   });
 
-  Future<List<Map<String, dynamic>>> _getCartDetails() async {
+  Future<List<Map<String, dynamic>>> _getCartDetails(int days) async {
     final List<Map<String, dynamic>> details = [];
+
     for (var entry in items.entries) {
       final equipment = await DBService().getEquipmentById(entry.key);
       if (equipment != null) {
         details.add({
           'equipment': equipment,
           'quantity': entry.value,
-          'subtotal': equipment.price * entry.value,
+          'subtotal': equipment.price * entry.value * days,
         });
       }
     }
+
     return details;
   }
 
-  Future<void> _submit(BuildContext context) async {
+  Future<void> _submit(BuildContext context, double total) async {
     final reminderDate = startDate.subtract(const Duration(days: 2));
     final rent = Rent(
       title: title,
@@ -48,6 +52,7 @@ class ConfirmRentScreen extends StatelessWidget {
       status: 'Por cumplir',
       reminderDate: reminderDate.toIso8601String(),
       userId: user.id!,
+      total: total,
     );
 
     final db = DBService();
@@ -61,6 +66,12 @@ class ConfirmRentScreen extends StatelessWidget {
       );
       await db.insertRentDetail(detail);
     }
+
+    await NotificationService.scheduleRentReminder(
+      id: rentId,
+      title: title,
+      startDate: startDate,
+    );
 
     Provider.of<CartProvider>(context, listen: false).clearCart();
 
@@ -97,10 +108,12 @@ class ConfirmRentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final int days = endDate.difference(startDate).inDays + 1;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Confirmar Renta')),
       body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _getCartDetails(),
+        future: _getCartDetails(days),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -126,6 +139,27 @@ class ConfirmRentScreen extends StatelessWidget {
                   'Fechas: ${startDate.toLocal().toString().split(' ')[0]} → ${endDate.toLocal().toString().split(' ')[0]}',
                   style: const TextStyle(fontSize: 16),
                 ),
+                const SizedBox(height: 8),
+                Chip(
+                  avatar: const Icon(
+                    Icons.calendar_today,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                  label: Text(
+                    'Renta por $days día(s)',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  backgroundColor: Colors.indigo,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+
                 const SizedBox(height: 16),
                 const Text(
                   'Productos seleccionados:',
@@ -176,7 +210,7 @@ class ConfirmRentScreen extends StatelessWidget {
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.check),
                     label: const Text('Registrar Renta'),
-                    onPressed: () => _submit(context),
+                    onPressed: () => _submit(context, total),
                   ),
                 ),
               ],

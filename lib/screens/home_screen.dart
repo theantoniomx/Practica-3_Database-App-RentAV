@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:practica_3_database/screens/users_scren.dart';
 import 'calendar_screen.dart';
 import 'add_rent_screen.dart';
+import 'services_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -8,27 +10,56 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('RentAV')),
-      body: GridView.count(
-        padding: const EdgeInsets.all(20),
-        crossAxisCount: 1,
-        mainAxisSpacing: 20,
-        childAspectRatio: 3,
-        children: [
-          _HomeButton(
-            icon: Icons.add_box,
-            label: 'Nueva Renta',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AddRentScreen()),
-            ),
-          ),
-          _HomeButton(
-            icon: Icons.calendar_today,
-            label: 'Calendario',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CalendarScreen()),
+      appBar: AppBar(
+        title: const Text('Práctica 5: Database'),
+        elevation: 4,
+        shadowColor: Colors.black54,
+      ),
+      body: CustomScrollView(
+        slivers: [
+          const SliverPadding(padding: EdgeInsets.only(top: 12)),
+          SliverPadding(
+            padding: const EdgeInsets.all(20),
+            sliver: SliverGrid(
+              delegate: SliverChildListDelegate.fixed([
+                _HomeButton(
+                  icon: Icons.add,
+                  label: 'Nueva Renta',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AddRentScreen()),
+                  ),
+                ),
+                _HomeButton(
+                  icon: Icons.calendar_month,
+                  label: 'Lista de Servicios',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CalendarScreen()),
+                  ),
+                ),
+                _HomeButton(
+                  icon: Icons.list,
+                  label: 'Categorías',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ServicesScreen()),
+                  ),
+                ),
+                _HomeButton(
+                  icon: Icons.account_circle_rounded,
+                  label: 'Clientes',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const UsersScreen()),
+                  ),
+                ),
+              ]),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 1,
+                mainAxisSpacing: 20,
+                childAspectRatio: 3,
+              ),
             ),
           ),
         ],

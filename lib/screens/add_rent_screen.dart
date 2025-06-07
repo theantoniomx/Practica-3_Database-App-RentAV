@@ -53,8 +53,20 @@ class _AddRentScreenState extends State<AddRentScreen> {
     if (!_formKey.currentState!.validate() ||
         _selectedUser == null ||
         _startDate == null ||
-        _endDate == null)
+        _endDate == null) {
       return;
+    }
+
+    if (_endDate!.isBefore(_startDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'La fecha de fin no puede ser anterior a la de inicio.',
+          ),
+        ),
+      );
+      return;
+    }
 
     Navigator.push(
       context,

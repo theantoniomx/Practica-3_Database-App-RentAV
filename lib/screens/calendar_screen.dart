@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
-import 'package:flutter_advanced_segment/flutter_advanced_segment.dart';
 import 'package:practica_3_database/models/rent.dart';
 import 'package:practica_3_database/services/db_service.dart';
+import 'package:practica_3_database/services/notification_service.dart';
 import 'home_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -17,9 +17,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
-  final _segmentController = ValueNotifier("Por cumplir");
+  final _segmentController = ValueNotifier("Todas");
 
   final List<String> _statuses = [
+    'Todas',
+    'Por cumplir',
+    'En proceso',
+    'Completado',
+    'Cancelado',
+  ];
+
+  final List<String> _editableStatuses = [
     'Por cumplir',
     'En proceso',
     'Completado',
@@ -40,7 +48,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _loadRents() async {
-    final rents = await DBService().getRentsByStatus(selectedStatusLabel);
+    List<Rent> rents;
+    if (selectedStatusLabel == 'Todas') {
+      rents = await DBService().getAllRents();
+    } else {
+      rents = await DBService().getRentsByStatus(selectedStatusLabel);
+    }
+
     final Map<DateTime, List<Rent>> grouped = {};
 
     for (var rent in rents) {
@@ -138,13 +152,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final clientName = await DBService().getUserNameById(rent.userId);
     final rentDetails = await DBService().getRentDetails(rent.id!);
 
+    final start = DateTime.parse(rent.startDate);
+    final end = DateTime.parse(rent.endDate);
+    final int days = end.difference(start).inDays + 1;
+
     final List<Map<String, dynamic>> equipmentList = [];
     double total = 0;
 
     for (final detail in rentDetails) {
       final equipment = await DBService().getEquipmentById(detail.equipmentId);
       if (equipment != null) {
-        double subtotal = equipment.price * detail.quantity;
+        double subtotal = equipment.price * detail.quantity * days;
         total += subtotal;
         equipmentList.add({
           'name': equipment.name,
@@ -232,6 +250,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     Text('Cliente: $clientName'),
                     Text('Inicio: ${rent.startDate.split("T")[0]}'),
                     Text('Fin: ${rent.endDate.split("T")[0]}'),
+                    const SizedBox(height: 8),
+                    Chip(
+                      avatar: const Icon(
+                        Icons.calendar_today,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      label: Text(
+                        'Renta por $days día(s)',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.indigo,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+
                     const SizedBox(height: 16),
                     const Text(
                       'Estado:',
@@ -243,7 +282,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                       ),
-                      items: _statuses.map((status) {
+                      items: _editableStatuses.map((status) {
                         return DropdownMenuItem<String>(
                           value: status,
                           child: Row(
@@ -259,7 +298,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         if (value != null && value != rent.status) {
                           setModalState(() => selectedStatus = value);
                           await DBService().updateRentStatus(rent.id!, value);
+
+                          if (value == 'Por cumplir' || value == 'En proceso') {
+                            await NotificationService.scheduleRentReminder(
+                              id: rent.id!,
+                              title: rent.title,
+                              startDate: DateTime.parse(rent.startDate),
+                            );
+                          } else if (value == 'Completado' ||
+                              value == 'Cancelado') {
+                            await NotificationService.cancelReminder(rent.id!);
+                          }
+
                           await _loadRents();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Estado actualizado'),
+                              ),
+                            );
+                          }
                         }
                       },
                     ),
@@ -319,28 +377,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'Completado':
-        return Colors.grey.shade200;
+        return Colors.grey.shade300;
       case 'Cancelado':
-        return Colors.red.shade100;
+        return Colors.red.shade300;
       case 'En proceso':
-        return Colors.orange.shade100;
+        return Colors.orange.shade300;
       case 'Por cumplir':
+        return Colors.green.shade300;
       default:
-        return Colors.green.shade100;
+        return Colors.blue.shade300;
     }
   }
 
   Icon _getStatusIcon(String status) {
     switch (status) {
       case 'Completado':
-        return const Icon(Icons.check_circle, color: Colors.grey);
+        return const Icon(Icons.verified, color: Colors.grey);
       case 'Cancelado':
-        return const Icon(Icons.cancel, color: Colors.red);
+        return const Icon(Icons.block, color: Colors.red);
       case 'En proceso':
-        return const Icon(Icons.access_time, color: Colors.orange);
+        return const Icon(Icons.autorenew, color: Colors.orange);
       case 'Por cumplir':
+        return const Icon(Icons.schedule, color: Colors.green);
       default:
-        return const Icon(Icons.pending, color: Colors.green);
+        return const Icon(Icons.list, color: Colors.indigo);
     }
   }
 
@@ -360,66 +420,144 @@ class _CalendarScreenState extends State<CalendarScreen> {
           },
         ),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Filtrar por estado:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              AdvancedSegment(
-                controller: _segmentController,
-                activeStyle: const TextStyle(
-                  fontWeight: FontWeight.normal,
-                  color: Colors.white,
+      body: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Filtrar por estado:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                segments: {
-                  'Por cumplir': 'Por cumplir',
-                  'En proceso': 'En proceso',
-                  'Completado': 'Completado',
-                  'Cancelado': 'Cancelado',
-                },
-                backgroundColor: Colors.grey.shade300,
-                sliderColor: () {
-                  switch (_segmentController.value) {
-                    case 'Por cumplir':
-                      return Colors.green;
-                    case 'En proceso':
-                      return Colors.orange;
-                    case 'Completado':
-                      return Colors.grey;
-                    case 'Cancelado':
-                      return Colors.red;
-                    default:
-                      return Colors.black87;
-                  }
-                }(),
               ),
-              const SizedBox(height: 20),
-              TableCalendar(
-                firstDay: DateTime.utc(2020, 1, 1),
-                lastDay: DateTime.utc(2100, 12, 31),
-                focusedDay: _focusedDay,
-                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                onDaySelected: _onDaySelected,
-                eventLoader: _getRentsForDay,
-                calendarStyle: CalendarStyle(
-                  markerDecoration: BoxDecoration(
-                    color: _getStatusColor(
-                      selectedStatusLabel,
-                    ).withOpacity(0.8),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(height: 60, child: _buildStatusFilterBar()),
+            ),
+            const SizedBox(height: 12),
+            const TabBar(
+              tabs: [
+                Tab(text: 'Lista'),
+                Tab(text: 'Calendario'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [_buildRentListView(), _buildCalendarView()],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRentListView() {
+    final allRents = _events.values.expand((e) => e).toList();
+    return allRents.isEmpty
+        ? const Center(child: Text('No hay rentas registradas.'))
+        : ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: allRents.length,
+            itemBuilder: (context, index) {
+              final rent = allRents[index];
+              return FutureBuilder<String>(
+                future: DBService().getUserNameById(rent.userId),
+                builder: (_, snapshot) {
+                  final client = snapshot.data ?? '...';
+                  return Card(
+                    color: _getStatusColor(rent.status),
+                    child: ListTile(
+                      title: Text(rent.title),
+                      subtitle: Text('Cliente: $client'),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () => _showRentDetailModal(rent),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+  }
+
+  Widget _buildCalendarView() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: TableCalendar<Rent>(
+        firstDay: DateTime.utc(2020, 1, 1),
+        lastDay: DateTime.utc(2100, 12, 31),
+        focusedDay: _focusedDay,
+        selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+        onDaySelected: _onDaySelected,
+        eventLoader: _getRentsForDay,
+        calendarStyle: const CalendarStyle(
+          markersAlignment: Alignment.bottomCenter,
+          markersMaxCount: 5,
+        ),
+        calendarBuilders: CalendarBuilders<Rent>(
+          markerBuilder: (context, date, rents) {
+            if (rents.isEmpty) return const SizedBox.shrink();
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: rents.take(5).map((rent) {
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 1.2),
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(rent.status),
                     shape: BoxShape.circle,
                   ),
-                ),
-              ),
-              const SizedBox(height: 100),
-            ],
-          ),
+                );
+              }).toList(),
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatusFilterBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: _statuses.map((status) {
+          final isSelected = selectedStatusLabel == status;
+          return GestureDetector(
+            onTap: () {
+              _segmentController.value = status;
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _getStatusIcon(status).icon,
+                  color: isSelected ? _getStatusColor(status) : Colors.grey,
+                ),
+                if (isSelected)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _getStatusColor(status),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }

@@ -56,15 +56,15 @@ class DBService {
 
     await db.execute('''
       CREATE TABLE rents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT,
-        startDate TEXT,
-        endDate TEXT,
-        status TEXT,
-        reminderDate TEXT,
-        userId INTEGER,
-        FOREIGN KEY (userId) REFERENCES users(id)
-      );
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT,
+      startDate TEXT,
+      endDate TEXT,
+      status TEXT,
+      reminderDate TEXT,
+      userId INTEGER,
+      total REAL
+    );
     ''');
 
     await db.execute('''
@@ -116,6 +116,35 @@ class DBService {
     return result.map((map) => Category.fromMap(map)).toList();
   }
 
+  Future<void> updateCategory(Category category) async {
+    final db = await database;
+    await db.update(
+      'categories',
+      category.toMap(),
+      where: 'id = ?',
+      whereArgs: [category.id],
+    );
+  }
+
+  Future<void> deleteCategory(int id) async {
+    final db = await database;
+    await db.delete('categories', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Category?> getCategoryById(int id) async {
+    final db = await database;
+    final result = await db.query(
+      'categories',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (result.isNotEmpty) {
+      return Category.fromMap(result.first);
+    }
+    return null;
+  }
+
   Future<List<Equipment>> getEquipmentByCategory(int categoryId) async {
     final db = await database;
     final result = await db.query(
@@ -124,6 +153,43 @@ class DBService {
       whereArgs: [categoryId],
     );
     return result.map((map) => Equipment.fromMap(map)).toList();
+  }
+
+  Future<void> deleteEquipment(int id) async {
+    final db = await database;
+    await db.delete('equipment', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<bool> isEquipmentInAnyRent(int equipmentId) async {
+    final db = await database;
+    final result = await db.query(
+      'rent_details',
+      where: 'equipmentId = ?',
+      whereArgs: [equipmentId],
+      limit: 1,
+    );
+    return result.isNotEmpty;
+  }
+
+  Future<void> updateEquipment(Equipment equipment) async {
+    final db = await database;
+    await db.update(
+      'equipment',
+      equipment.toMap(),
+      where: 'id = ?',
+      whereArgs: [equipment.id],
+    );
+  }
+
+  Future<bool> hasUserAnyRent(int userId) async {
+    final db = await database;
+    final result = await db.query(
+      'rents',
+      where: 'userId = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    return result.isNotEmpty;
   }
 
   Future<List<Rent>> getRentsByStatus(String status) async {
@@ -160,6 +226,35 @@ class DBService {
     return null;
   }
 
+  Future<void> updateUser(User user) async {
+    final db = await database;
+    await db.update(
+      'users',
+      user.toMap(),
+      where: 'id = ?',
+      whereArgs: [user.id],
+    );
+  }
+
+  Future<void> deleteUser(int id) async {
+    final db = await database;
+    await db.delete('users', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<User?> getUserById(int id) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (result.isNotEmpty) {
+      return User.fromMap(result.first);
+    }
+    return null;
+  }
+
   Future<String> getUserNameById(int userId) async {
     final db = await database;
     final result = await db.query(
@@ -173,6 +268,12 @@ class DBService {
       return result.first['name'] as String;
     }
     return 'Desconocido';
+  }
+
+  Future<List<Rent>> getAllRents() async {
+    final db = await database;
+    final result = await db.query('rents');
+    return result.map((map) => Rent.fromMap(map)).toList();
   }
 
   Future<List<RentDetail>> getRentDetails(int rentId) async {
@@ -201,22 +302,6 @@ class DBService {
     final existingCategories = await db.query('categories');
 
     if (existingCategories.isEmpty) {
-      await db.insert('users', {
-        'name': 'Carlos Mendoza',
-        'email': 'carlos@example.com',
-        'phone': '4621234567',
-      });
-      await db.insert('users', {
-        'name': 'María López',
-        'email': 'maria@example.com',
-        'phone': '4627654321',
-      });
-      await db.insert('users', {
-        'name': 'Alejandro Torres',
-        'email': 'alejandro@example.com',
-        'phone': '4628889999',
-      });
-      // Categorías
       final audioId = await db.insert('categories', {
         'name': 'Audio',
         'imagePath': 'assets/images/categories/audio.png',
@@ -234,7 +319,6 @@ class DBService {
         'imagePath': 'assets/images/categories/sonido.png',
       });
 
-      // Equipos de Audio
       await db.insert('equipment', {
         'name': 'Micrófono Inalámbrico',
         'description': 'Micrófono ideal para presentaciones en vivo.',
@@ -250,7 +334,6 @@ class DBService {
         'categoryId': audioId,
       });
 
-      // Equipos de Video
       await db.insert('equipment', {
         'name': 'Cámara Canon XA40',
         'description': 'Cámara profesional con zoom óptico 20x.',
@@ -266,7 +349,6 @@ class DBService {
         'categoryId': videoId,
       });
 
-      // Equipos de Iluminación
       await db.insert('equipment', {
         'name': 'Panel LED Neewer',
         'description': 'Luz LED con control de temperatura.',
@@ -274,6 +356,7 @@ class DBService {
         'imagePath': 'assets/images/equipment/panel_led.png',
         'categoryId': iluminacionId,
       });
+
       await db.insert('equipment', {
         'name': 'Luz Par LED RGB',
         'description': 'Luz escénica multicolor controlable.',
@@ -282,7 +365,6 @@ class DBService {
         'categoryId': iluminacionId,
       });
 
-      // Equipos de Sonido
       await db.insert('equipment', {
         'name': 'Consola Behringer Xenyx',
         'description': 'Mezcladora de 8 canales con efectos.',
@@ -290,6 +372,7 @@ class DBService {
         'imagePath': 'assets/images/equipment/console_xenyx.png',
         'categoryId': sonidoId,
       });
+
       await db.insert('equipment', {
         'name': 'Monitor de escenario Yamaha',
         'description': 'Altavoz pasivo para monitoreo en vivo.',

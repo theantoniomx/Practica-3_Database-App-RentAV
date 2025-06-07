@@ -6,6 +6,7 @@ class Rent {
   final String status;
   final String reminderDate;
   final int userId;
+  final double total;
 
   Rent({
     this.id,
@@ -15,6 +16,7 @@ class Rent {
     required this.status,
     required this.reminderDate,
     required this.userId,
+    required this.total,
   });
 
   factory Rent.fromMap(Map<String, dynamic> map) {
@@ -26,6 +28,7 @@ class Rent {
       status: map['status'],
       reminderDate: map['reminderDate'],
       userId: map['userId'],
+      total: map['total'],
     );
   }
 
@@ -38,6 +41,7 @@ class Rent {
       'status': status,
       'reminderDate': reminderDate,
       'userId': userId,
+      'total': total,
     };
   }
 }

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:practica_3_database/models/equipment.dart';
-import 'package:practica_3_database/providers/cart_provider.dart';
+import '../providers/cart_provider.dart';
+import 'dart:io';
 
 class EquipmentCard extends StatefulWidget {
   final Equipment equipment;
@@ -24,64 +25,106 @@ class _EquipmentCardState extends State<EquipmentCard> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              widget.equipment.name,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Container(
+              width: 80,
+              height: 80,
+              padding: const EdgeInsets.all(4),
+              child: widget.equipment.imagePath.startsWith('assets/')
+                  ? Image.asset(
+                      widget.equipment.imagePath,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image, size: 70),
+                    )
+                  : Image.file(
+                      File(widget.equipment.imagePath),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image, size: 70),
+                    ),
             ),
-            const SizedBox(height: 6),
-            Text(widget.equipment.description),
-            const SizedBox(height: 6),
-            Text(
-              '\$${widget.equipment.price.toStringAsFixed(2)} MXN',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: Colors.indigo,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.equipment.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.equipment.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '\$${widget.equipment.price.toStringAsFixed(2)} MXN',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.indigo,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: _quantity > 0
+                            ? () => setState(() => _quantity--)
+                            : null,
+                      ),
+                      Text('$_quantity', style: const TextStyle(fontSize: 16)),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle_outline),
+                        onPressed: () => setState(() => _quantity++),
+                      ),
+                      const Spacer(),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          minWidth: 80,
+                          maxWidth: 120,
+                          minHeight: 36,
+                        ),
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.add_shopping_cart, size: 18),
+                          label: const Text(
+                            'Agregar',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: _quantity > 0
+                              ? () {
+                                  cartProvider.addToCart(
+                                    widget.equipment,
+                                    _quantity,
+                                  );
+                                  setState(() => _quantity = 0);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Equipo agregado al carrito',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: _quantity > 0
-                      ? () {
-                          setState(() {
-                            _quantity--;
-                          });
-                        }
-                      : null,
-                ),
-                Text('$_quantity', style: const TextStyle(fontSize: 16)),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline),
-                  onPressed: () {
-                    setState(() {
-                      _quantity++;
-                    });
-                  },
-                ),
-                const Spacer(),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.add_shopping_cart),
-                  label: const Text('Agregar'),
-                  onPressed: _quantity > 0
-                      ? () {
-                          cartProvider.addToCart(widget.equipment, _quantity);
-                          setState(() {
-                            _quantity = 0;
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Equipo agregado al carrito'),
-                            ),
-                          );
-                        }
-                      : null,
-                ),
-              ],
             ),
           ],
         ),
